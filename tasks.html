@@ -147,13 +147,49 @@ window.dataReady.then(() => {
       return `<div class="w-full aspect-square md:aspect-[4/5] rounded-2xl bg-gray-800 flex items-center justify-center text-gray-500 text-sm text-center p-4">ยังไม่มีรูปภาพ<br>เพิ่มได้ที่ img/ แล้วแก้ WEEK_DETAILS ใน data.js</div>`;
     }
     const slides = photos.map((p, i) => `<img src="${p}" class="carousel-slide w-full aspect-square md:aspect-[4/5] object-cover rounded-2xl ${i===0?'':'hidden'}" data-day="${dayIdx}" data-idx="${i}">`).join('');
-    const dots = photos.map((_, i) => `<span class="carousel-dot w-2 h-2 rounded-full ${i===0?'bg-[#a855f7]':'bg-gray-700'} cursor-pointer" data-day="${dayIdx}" data-idx="${i}"></span>`).join('');
+    // ปุ่มจุด: ตัวปุ่ม (button) มีพื้นที่กดใหญ่กว่าจุดที่มองเห็น (padding รอบ ๆ) เพื่อให้แตะง่ายขึ้นบนมือถือ
+    const dots = photos.map((_, i) => `
+      <button type="button" class="p-2.5 -m-1 flex items-center justify-center" data-day="${dayIdx}" data-idx="${i}" aria-label="ดูรูปที่ ${i + 1}">
+        <span class="carousel-dot block w-2.5 h-2.5 rounded-full pointer-events-none ${i===0?'bg-[#a855f7]':'bg-gray-700'}" data-day="${dayIdx}" data-idx="${i}"></span>
+      </button>
+    `).join('');
+    const showArrows = photos.length > 1;
     return `
       <div class="relative">
         ${slides}
-        <div class="flex justify-center gap-2 mt-3">${dots}</div>
+        ${showArrows ? `
+        <button type="button" class="carousel-prev absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white w-9 h-9 rounded-full flex items-center justify-center" data-day="${dayIdx}" aria-label="รูปก่อนหน้า">‹</button>
+        <button type="button" class="carousel-next absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white w-9 h-9 rounded-full flex items-center justify-center" data-day="${dayIdx}" aria-label="รูปถัดไป">›</button>
+        ` : ''}
+        <div class="flex justify-center items-center gap-1 mt-3">${dots}</div>
       </div>
     `;
+  }
+
+  // ===== ตัวช่วยสลับรูปใน carousel (ใช้ร่วมกันทั้งจุด, ลูกศร, และเลื่อนอัตโนมัติ) =====
+  let carouselTimers = [];
+  let carouselState = {}; // { dayIdx: currentPhotoIndex }
+
+  function clearCarouselTimers() {
+    carouselTimers.forEach(id => clearInterval(id));
+    carouselTimers = [];
+  }
+
+  function goToSlide(day, idx) {
+    idx = parseInt(idx);
+    carouselState[day] = idx;
+    detail.querySelectorAll(`.carousel-slide[data-day="${day}"]`).forEach(s => s.classList.add('hidden'));
+    const targetSlide = detail.querySelector(`.carousel-slide[data-day="${day}"][data-idx="${idx}"]`);
+    if (targetSlide) targetSlide.classList.remove('hidden');
+    detail.querySelectorAll(`.carousel-dot[data-day="${day}"]`).forEach(d => {
+      d.classList.remove('bg-[#a855f7]');
+      d.classList.add('bg-gray-700');
+    });
+    const activeDot = detail.querySelector(`.carousel-dot[data-day="${day}"][data-idx="${idx}"]`);
+    if (activeDot) {
+      activeDot.classList.remove('bg-gray-700');
+      activeDot.classList.add('bg-[#a855f7]');
+    }
   }
 
   function showWeekDetail(w) {
@@ -184,17 +220,36 @@ window.dataReady.then(() => {
       </div>
     `;
 
-    // เปิดใช้งานปุ่มจุดสำหรับสลับรูปใน carousel
-    detail.querySelectorAll('.carousel-dot').forEach(dot => {
-      dot.addEventListener('click', () => {
-        const day = dot.dataset.day, idx = dot.dataset.idx;
-        detail.querySelectorAll(`.carousel-slide[data-day="${day}"]`).forEach(s => s.classList.add('hidden'));
-        detail.querySelector(`.carousel-slide[data-day="${day}"][data-idx="${idx}"]`).classList.remove('hidden');
-        detail.querySelectorAll(`.carousel-dot[data-day="${day}"]`).forEach(d => d.classList.remove('bg-[#a855f7]'));
-        detail.querySelectorAll(`.carousel-dot[data-day="${day}"]`).forEach(d => d.classList.add('bg-gray-700'));
-        dot.classList.remove('bg-gray-700');
-        dot.classList.add('bg-[#a855f7]');
+    // ===== สลับรูปด้วยจุด / ลูกศร / เลื่อนอัตโนมัติ =====
+    clearCarouselTimers();
+    carouselState = {};
+
+    detail.querySelectorAll('.carousel-dot').forEach(dotEl => {
+      const dot = dotEl.closest('button');
+      dot.addEventListener('click', () => goToSlide(dotEl.dataset.day, dotEl.dataset.idx));
+    });
+
+    detail.querySelectorAll('.carousel-prev, .carousel-next').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const day = btn.dataset.day;
+        const total = detail.querySelectorAll(`.carousel-slide[data-day="${day}"]`).length;
+        const cur = carouselState[day] || 0;
+        const dir = btn.classList.contains('carousel-next') ? 1 : -1;
+        const next = (cur + dir + total) % total;
+        goToSlide(day, next);
       });
+    });
+
+    days.forEach((day, i) => {
+      const photoCount = (day.photos || []).length;
+      carouselState[i] = 0;
+      if (photoCount > 1) {
+        const timer = setInterval(() => {
+          const next = ((carouselState[i] || 0) + 1) % photoCount;
+          goToSlide(i, next);
+        }, 4000);
+        carouselTimers.push(timer);
+      }
     });
 
     detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
