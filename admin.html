@@ -106,7 +106,14 @@
     <h2 class="heading text-2xl text-[#a855f7] mb-2">ลงเวลา</h2>
     <p class="text-sm text-gray-400 mb-2">กรอกเวลาเข้า-ออกจริงของแต่ละคนแต่ละวัน ถ้าวันไหนไม่กรอก ระบบจะคำนวณให้อัตโนมัติ (เข้า 08:30 ออก 16:30 ทุกวันทำการ เสาร์-อาทิตย์ = วันหยุด)</p>
 
-    <div class="grid md:grid-cols-4 gap-3 items-end border border-[#2b2440] rounded-xl p-4">
+    <div class="grid md:grid-cols-5 gap-3 items-end border border-[#2b2440] rounded-xl p-4">
+      <div>
+        <span class="label">สถานะ</span>
+        <select id="tl-status" class="input">
+          <option value="normal">มาทำงานปกติ</option>
+          <option value="leave">ลา / หยุด</option>
+        </select>
+      </div>
       <div>
         <span class="label">สมาชิก</span>
         <select id="tl-member" class="input"></select>
@@ -115,16 +122,16 @@
         <span class="label">วันที่</span>
         <input type="date" id="tl-date" class="input">
       </div>
-      <div>
+      <div id="tl-checkin-wrap">
         <span class="label">เวลาเข้า</span>
         <input type="time" id="tl-checkin" class="input">
       </div>
-      <div>
+      <div id="tl-checkout-wrap">
         <span class="label">เวลาออก</span>
         <input type="time" id="tl-checkout" class="input">
       </div>
-      <div class="md:col-span-3">
-        <span class="label">หมายเหตุ (ไม่บังคับ เช่น ลาป่วย, ทำงานล่วงเวลา)</span>
+      <div class="md:col-span-4">
+        <span class="label" id="tl-note-label">หมายเหตุ (ไม่บังคับ เช่น ลาป่วย, ทำงานล่วงเวลา)</span>
         <input type="text" id="tl-note" class="input" placeholder="เว้นว่างไว้ได้ถ้าไม่มี">
       </div>
       <div>
@@ -367,6 +374,23 @@ window.dataReady.then(() => {
   document.getElementById('tl-checkin').value = SITE.dailyStart;
   document.getElementById('tl-checkout').value = SITE.dailyEnd;
 
+  // สลับซ่อน/แสดงช่องเวลาเข้า-ออก ตามสถานะที่เลือก (ปกติ / ลา-หยุด)
+  const tlStatusEl = document.getElementById('tl-status');
+  const checkinWrap = document.getElementById('tl-checkin-wrap');
+  const checkoutWrap = document.getElementById('tl-checkout-wrap');
+  const tlNoteLabel = document.getElementById('tl-note-label');
+
+  function updateStatusUI() {
+    const isLeave = tlStatusEl.value === 'leave';
+    checkinWrap.classList.toggle('hidden', isLeave);
+    checkoutWrap.classList.toggle('hidden', isLeave);
+    tlNoteLabel.textContent = isLeave
+      ? 'หมายเหตุ (ระบุเหตุผล เช่น ลาป่วย, ลากิจ)'
+      : 'หมายเหตุ (ไม่บังคับ เช่น ทำงานล่วงเวลา)';
+  }
+  tlStatusEl.addEventListener('change', updateStatusUI);
+  updateStatusUI();
+
   function renderTimeLogTable() {
     const tbody = document.getElementById('tl-tbody');
     tbody.innerHTML = '';
@@ -381,9 +405,9 @@ window.dataReady.then(() => {
       tr.innerHTML = `
         <td class="px-3 py-2">${name}</td>
         <td class="px-3 py-2">${dateStr}</td>
-        <td class="px-3 py-2">${entry.checkIn || '-'}</td>
-        <td class="px-3 py-2">${entry.checkOut || '-'}</td>
-        <td class="px-3 py-2">${hours.toFixed(2)}</td>
+        <td class="px-3 py-2">${entry.isLeave ? '<span class="text-yellow-400">ลา/หยุด</span>' : (entry.checkIn || '-')}</td>
+        <td class="px-3 py-2">${entry.isLeave ? '-' : (entry.checkOut || '-')}</td>
+        <td class="px-3 py-2">${entry.isLeave ? '-' : hours.toFixed(2)}</td>
         <td class="px-3 py-2 text-gray-400">${entry.note || '-'}</td>
         <td class="px-3 py-2"><button class="btn-danger" data-key="${key}">🗑</button></td>
       `;
@@ -411,12 +435,14 @@ window.dataReady.then(() => {
   document.getElementById('tl-save').addEventListener('click', async () => {
     const name = tlMemberEl.value;
     const dateStr = document.getElementById('tl-date').value;
-    const checkIn = document.getElementById('tl-checkin').value;
-    const checkOut = document.getElementById('tl-checkout').value;
+    const isLeave = tlStatusEl.value === 'leave';
+    const checkIn = isLeave ? '-' : document.getElementById('tl-checkin').value;
+    const checkOut = isLeave ? '-' : document.getElementById('tl-checkout').value;
     const note = document.getElementById('tl-note').value;
     if (!dateStr) { alert('กรุณาเลือกวันที่'); return; }
+    if (isLeave && !note) { alert('กรุณาระบุหมายเหตุ เช่น ลาป่วย หรือ ลากิจ'); return; }
 
-    timeLogDraft[timeLogKey(name, dateStr)] = { checkIn, checkOut, note };
+    timeLogDraft[timeLogKey(name, dateStr)] = { checkIn, checkOut, note, isLeave };
     const ok = await persistTimeLog();
     renderTimeLogTable();
     if (ok) flashMsg('tl-save-msg');
@@ -425,6 +451,8 @@ window.dataReady.then(() => {
     const nextDate = new Date(dateStr + "T00:00:00");
     nextDate.setDate(nextDate.getDate() + 1);
     document.getElementById('tl-date').value = nextDate.toISOString().slice(0, 10);
+    tlStatusEl.value = 'normal';
+    updateStatusUI();
     document.getElementById('tl-checkin').value = SITE.dailyStart;
     document.getElementById('tl-checkout').value = SITE.dailyEnd;
     document.getElementById('tl-note').value = '';
