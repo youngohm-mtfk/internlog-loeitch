@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ลงเวลา | วิทยาลัยเทคนิคเลย</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+Thai:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="space-bg"></div>
+
+<!-- LOADING SCREEN: ครอบไว้ตอนกำลังโหลดข้อมูลจาก Firebase กันไม่ให้เห็นหน้าที่ยังจัดเรียงไม่เสร็จ -->
+<div id="page-loader">
+  <div class="loader-logo heading">LTC</div>
+  <div class="loader-spinner"></div>
+  <div class="loader-text">กำลังโหลดข้อมูล...</div>
+</div>
+
+<div id="scroll-progress"></div>
+
+<header class="sticky top-4 z-40 px-4">
+  <nav class="nav-pill max-w-2xl mx-auto flex items-center justify-center gap-4 md:gap-6 px-6 py-3 text-sm flex-wrap">
+    <a href="index.html" class="nav-link">หน้าแรก</a>
+    <a href="log.html" class="nav-link active">ลงเวลา</a>
+    <a href="tasks.html" class="nav-link">งานที่ได้มอบหมาย</a>
+    <a href="admin.html" class="nav-link">⚙️ จัดการข้อมูล</a>
+  </nav>
+</header>
+
+<section class="max-w-6xl mx-auto px-6 pt-10">
+  <div class="fade-in-up">
+    <h1 class="heading text-5xl text-white">ลงเวลา</h1>
+    <div class="w-16 h-1.5 bg-[#a855f7] rounded-full my-3"></div>
+    <p class="text-gray-300 mb-8">บันทึกเวลาเข้า-ออกงานระหว่างการฝึกประสบการณ์วิชาชีพ</p>
+  </div>
+
+  <!-- STATS -->
+  <div class="grid md:grid-cols-3 gap-5 mb-8 fade-in-up">
+    <div class="soft-card p-6 text-center">
+      <div class="text-sm text-gray-400 mb-1">จำนวนวันทั้งหมด</div>
+      <div class="heading text-4xl text-[#a855f7]" id="stat-days">-</div>
+      <div class="text-xs text-gray-500">วัน</div>
+    </div>
+    <div class="soft-card p-6 text-center">
+      <div class="text-sm text-gray-400 mb-1">ชั่วโมงรวม</div>
+      <div class="heading text-4xl text-[#a855f7]" id="stat-hours">-</div>
+      <div class="text-xs text-gray-500">ชั่วโมง</div>
+    </div>
+    <div class="soft-card p-6 text-center">
+      <div class="text-sm text-gray-400 mb-1">เฉลี่ยต่อวัน</div>
+      <div class="heading text-4xl text-[#a855f7]" id="stat-avg">-</div>
+      <div class="text-xs text-gray-500">ชั่วโมง/วัน</div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="flex flex-wrap gap-4 mb-6 fade-in-up items-center">
+    <div class="flex items-center gap-2 text-sm">
+      <label class="text-gray-300">กรองตามชื่อ:</label>
+      <select id="filter-name" class="rounded-lg border border-[#2b2440] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#a855f7]">
+        <option value="all">ทั้งหมด</option>
+      </select>
+    </div>
+    <div class="flex items-center gap-2 text-sm">
+      <label class="text-gray-300">สัปดาห์ที่:</label>
+      <select id="filter-week" class="rounded-lg border border-[#2b2440] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#a855f7]">
+        <option value="all">ทั้งหมด</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="soft-card overflow-hidden mb-16 fade-in-up">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-[#a855f7] text-white text-left">
+            <th class="px-5 py-3 font-medium">ลำดับ</th>
+            <th class="px-5 py-3 font-medium">ชื่อ-นามสกุล</th>
+            <th class="px-5 py-3 font-medium">วันที่</th>
+            <th class="px-5 py-3 font-medium">เวลาเข้า</th>
+            <th class="px-5 py-3 font-medium">เวลาออก</th>
+            <th class="px-5 py-3 font-medium">รวม (ชม.)</th>
+            <th class="px-5 py-3 font-medium">หมายเหตุ</th>
+          </tr>
+        </thead>
+        <tbody id="log-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer class="bg-[#120e1c] text-center py-10 px-6">
+  <div class="heading text-2xl text-[#a855f7]" data-college-th></div>
+  <div class="text-gray-300 text-sm mb-4" data-college-en></div>
+  <div class="text-sm text-gray-300 space-y-1">
+    <div>📍 <span data-address></span></div>
+    <div>📞 <span data-phone></span></div>
+  </div>
+</footer>
+
+<button id="back-to-top" aria-label="กลับขึ้นด้านบน">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 15l-6-6-6 6"/>
+  </svg>
+</button>
+
+<script src="data.js"></script>
+<script src="firebase-sync.js"></script>
+<script src="common.js"></script>
+<script>
+window.dataReady.then(() => {
+  const allLogs = generateTimeLogs();
+  const weeks = generateWeeks();
+
+  // เติม dropdown ชื่อ
+  const nameSelect = document.getElementById('filter-name');
+  MEMBERS.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name;
+    nameSelect.appendChild(opt);
+  });
+
+  // เติม dropdown สัปดาห์
+  const weekSelect = document.getElementById('filter-week');
+  weeks.forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w.no;
+    opt.textContent = `สัปดาห์ที่ ${w.no} (${formatThaiShort(w.start)} - ${formatThaiShort(w.end)})`;
+    weekSelect.appendChild(opt);
+  });
+
+  function getWeekNo(date) {
+    const start = new Date(SITE.startDate + "T00:00:00");
+    const diffDays = Math.floor((date - start) / (1000*60*60*24));
+    return Math.floor(diffDays / 7) + 1;
+  }
+
+  function renderTable() {
+    const nameFilter = nameSelect.value;
+    const weekFilter = weekSelect.value;
+    const filtered = allLogs.filter(log => {
+      const nameOk = nameFilter === 'all' || log.name === nameFilter;
+      const weekOk = weekFilter === 'all' || getWeekNo(log.date) === parseInt(weekFilter);
+      return nameOk && weekOk;
+    });
+
+    const tbody = document.getElementById('log-tbody');
+    tbody.innerHTML = '';
+    filtered.forEach((log, i) => {
+      const tr = document.createElement('tr');
+      tr.className = i % 2 === 0 ? 'bg-[#0c0c1e]' : 'bg-[#0e0e22]';
+      tr.innerHTML = `
+        <td class="px-5 py-3 text-gray-400">${i+1}</td>
+        <td class="px-5 py-3 font-medium text-gray-200">${log.name}</td>
+        <td class="px-5 py-3 text-gray-300">${formatThaiDate(log.date)}</td>
+        <td class="px-5 py-3 text-[#a855f7] font-medium">${log.checkIn}</td>
+        <td class="px-5 py-3 text-[#a855f7] font-medium">${log.checkOut}</td>
+        <td class="px-5 py-3"><span class="bg-[#1a1330] text-[#a855f7] px-3 py-1 rounded-full text-xs font-medium">${log.hours.toFixed(2)} ชม.</span></td>
+        <td class="px-5 py-3 text-gray-500">${log.note}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // สรุปสถิติ
+    const totalHours = filtered.reduce((sum, l) => sum + l.hours, 0);
+    const uniqueDates = new Set(filtered.map(l => l.date.toDateString()));
+    document.getElementById('stat-days').textContent = uniqueDates.size;
+    document.getElementById('stat-hours').textContent = totalHours.toFixed(1);
+    document.getElementById('stat-avg').textContent = uniqueDates.size ? (totalHours / uniqueDates.size).toFixed(1) : '0';
+  }
+
+  nameSelect.addEventListener('change', renderTable);
+  weekSelect.addEventListener('change', renderTable);
+  renderTable();
+});
+</script>
+</body>
+</html>

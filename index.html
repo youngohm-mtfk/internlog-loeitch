@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>วิทยาลัยเทคนิคเลย | เด็กฝึกงาน 2569</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+Thai:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="space-bg"></div>
+
+<!-- LOADING SCREEN: ครอบไว้ตอนกำลังโหลดข้อมูลจาก Firebase กันไม่ให้เห็นหน้าที่ยังจัดเรียงไม่เสร็จ -->
+<div id="page-loader">
+  <div class="loader-logo heading">LTC</div>
+  <div class="loader-spinner"></div>
+  <div class="loader-text">กำลังโหลดข้อมูล...</div>
+</div>
+
+<div id="scroll-progress"></div>
+
+<!-- NAVBAR -->
+<header class="sticky top-4 z-40 px-4">
+  <nav class="nav-pill max-w-2xl mx-auto flex items-center justify-center gap-4 md:gap-6 px-6 py-3 text-sm flex-wrap">
+    <a href="index.html" class="nav-link active">หน้าแรก</a>
+    <a href="log.html" class="nav-link">ลงเวลา</a>
+    <a href="tasks.html" class="nav-link">งานที่ได้มอบหมาย</a>
+    <a href="admin.html" class="nav-link">⚙️ จัดการข้อมูล</a>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section class="max-w-6xl mx-auto px-6 py-16 grid md:grid-cols-2 gap-10 items-center">
+  <div class="fade-in-up">
+    <h1 class="heading text-5xl text-white" data-college-th></h1>
+    <div class="w-16 h-1.5 bg-[#a855f7] rounded-full my-3"></div>
+    <h2 class="heading text-3xl text-[#a855f7] mb-6" data-college-en></h2>
+
+    <div id="date-badge" class="inline-flex items-center gap-3 bg-[#0c0c1e] rounded-2xl px-5 py-3 shadow-md border border-[#2b2440] mb-4">
+      <span class="text-2xl">📅</span>
+      <span id="date-range-text" class="text-gray-200 font-medium"></span>
+    </div>
+
+    <div class="space-y-2 text-sm text-gray-300">
+      <div class="flex items-center gap-2"><span>📍</span><span data-address></span></div>
+      <div class="flex items-center gap-2"><span>📞</span><span data-phone></span></div>
+    </div>
+  </div>
+
+  <div id="hero-image-box" class="fade-in-up rounded-3xl overflow-hidden shadow-xl aspect-video bg-gradient-to-br from-[#a7d8b0] to-[#7ec18a] flex items-center justify-center text-white/80 text-sm text-center p-4">
+    ยังไม่มีรูปอาคาร<br>ไปที่เมนู "⚙️ จัดการข้อมูล" แล้วอัปโหลดได้เลย
+  </div>
+</section>
+
+<!-- BATCH BANNER -->
+<section class="max-w-6xl mx-auto px-6 pb-16 fade-in-up">
+  <div id="banner" class="rounded-3xl overflow-hidden shadow-2xl relative aspect-video md:aspect-[21/9] bg-gradient-to-br from-[#a855f7] via-[#f472b6] to-[#00e5ff]">
+    <img id="banner-img" class="absolute inset-0 w-full h-full object-cover hidden" alt="">
+    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
+    <div class="absolute inset-0 flex items-center justify-center px-8 text-center">
+      <h2 class="heading text-6xl md:text-8xl text-white drop-shadow-lg" id="batch-title"></h2>
+    </div>
+  </div>
+</section>
+
+<!-- MEMBERS DETAIL -->
+<section class="max-w-4xl mx-auto px-6 pb-20">
+  <div class="fade-in-up text-center mb-10">
+    <h2 class="heading text-4xl text-[#a855f7]">สมาชิก</h2>
+    <div class="w-16 h-1 bg-[#a855f7] rounded-full mx-auto mt-2"></div>
+  </div>
+  <div id="member-list" class="space-y-6"></div>
+</section>
+
+<!-- FOOTER -->
+<footer class="bg-[#120e1c] text-center py-10 px-6">
+  <div class="heading text-2xl text-[#a855f7]" data-college-th></div>
+  <div class="text-gray-300 text-sm mb-4" data-college-en></div>
+  <div class="text-sm text-gray-300 space-y-1">
+    <div>📍 <span data-address></span></div>
+    <div>📞 <span data-phone></span></div>
+  </div>
+</footer>
+
+<button id="back-to-top" aria-label="กลับขึ้นด้านบน">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 15l-6-6-6 6"/>
+  </svg>
+</button>
+
+<script src="data.js"></script>
+<script src="firebase-sync.js"></script>
+<script src="common.js"></script>
+<script>
+window.dataReady.then(() => {
+  // วันที่ฝึกงาน
+  const start = new Date(SITE.startDate + "T00:00:00");
+  const end = new Date(SITE.endDate + "T00:00:00");
+  document.getElementById('date-range-text').textContent =
+    `${formatThaiShort(start)} - ${formatThaiDate(end)}`;
+
+  document.getElementById('batch-title').textContent = SITE.batchTitle;
+
+  // แสดงรูปอาคาร/ภาพหลัก ถ้ามีการอัปโหลดไว้ผ่านหน้าจัดการข้อมูล
+  if (SITE.heroImage) {
+    document.getElementById('hero-image-box').outerHTML =
+      `<img src="${SITE.heroImage}" class="fade-in-up show rounded-3xl overflow-hidden shadow-xl aspect-video w-full object-cover">`;
+  }
+
+  // รูปเต็มกรอบในแบนเนอร์ "เด็กฝึกงาน" — อัปโหลดแยกต่างหากผ่านหน้าจัดการข้อมูล (ข้อมูลเว็บไซต์ > รูปแบนเนอร์)
+  if (SITE.bannerImage) {
+    const bannerImg = document.getElementById('banner-img');
+    bannerImg.src = SITE.bannerImage;
+    bannerImg.alt = SITE.batchTitle;
+    bannerImg.classList.remove('hidden');
+  }
+
+  // รายละเอียดสมาชิกแบบ list
+  const listWrap = document.getElementById('member-list');
+  MEMBERS.forEach((m, i) => {
+    const row = document.createElement('div');
+    row.className = 'fade-in-up flex items-center gap-6 soft-card p-5';
+    row.innerHTML = `
+      ${avatarHtml(m, 'w-24 h-24 flex-shrink-0')}
+      <div class="flex-1">
+        <div class="font-semibold text-lg text-white">${m.name}${m.role === 'head' ? ' <span class="text-xs text-[#a855f7] bg-[#1a1330] px-2 py-0.5 rounded-full ml-1">หัวหน้างาน</span>' : ''}</div>
+        <div class="flex flex-wrap gap-2 mt-2 text-sm">
+          <span class="bg-[#1a1330] text-[#a855f7] px-3 py-1 rounded-full">🎓 ${m.id}</span>
+          <span class="bg-[#1a1330] text-[#a855f7] px-3 py-1 rounded-full">📞 ${m.phone}</span>
+        </div>
+      </div>
+      <div class="w-9 h-9 rounded-full bg-[#a855f7] text-white flex items-center justify-center text-sm font-bold">${String(i+1).padStart(2,'0')}</div>
+    `;
+    listWrap.appendChild(row);
+  });
+
+  // สำคัญ: เรียกซ้ำเพื่อให้การ์ดที่เพิ่งสร้างขึ้นมาถูกจับตาแสดงผล (ไม่งั้นจะค้างมองไม่เห็น)
+  if (window.initFadeIn) window.initFadeIn();
+});
+</script>
+</body>
+</html>

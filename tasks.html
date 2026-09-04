@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>งานที่ได้มอบหมาย | วิทยาลัยเทคนิคเลย</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+Thai:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="space-bg"></div>
+
+<!-- LOADING SCREEN: ครอบไว้ตอนกำลังโหลดข้อมูลจาก Firebase กันไม่ให้เห็นหน้าที่ยังจัดเรียงไม่เสร็จ -->
+<div id="page-loader">
+  <div class="loader-logo heading">LTC</div>
+  <div class="loader-spinner"></div>
+  <div class="loader-text">กำลังโหลดข้อมูล...</div>
+</div>
+
+<div id="scroll-progress"></div>
+
+<header class="sticky top-4 z-40 px-4">
+  <nav class="nav-pill max-w-2xl mx-auto flex items-center justify-center gap-4 md:gap-6 px-6 py-3 text-sm flex-wrap">
+    <a href="index.html" class="nav-link">หน้าแรก</a>
+    <a href="log.html" class="nav-link">ลงเวลา</a>
+    <a href="tasks.html" class="nav-link active">งานที่ได้มอบหมาย</a>
+    <a href="admin.html" class="nav-link">⚙️ จัดการข้อมูล</a>
+  </nav>
+</header>
+
+<section class="max-w-6xl mx-auto px-6 pt-10 pb-16">
+  <div class="fade-in-up">
+    <h1 class="heading text-5xl text-white">งานที่ได้มอบหมาย</h1>
+    <div class="w-16 h-1.5 bg-[#a855f7] rounded-full my-3"></div>
+    <p class="text-gray-300 mb-2">บันทึกงานที่ได้รับมอบหมายระหว่างการฝึกประสบการณ์วิชาชีพ</p>
+    <p class="text-sm text-[#a855f7] mb-8">💡 กดที่สัปดาห์เพื่อดูรายละเอียดเพิ่มเติม</p>
+  </div>
+
+  <!-- OVERALL PROGRESS -->
+  <div class="soft-card p-6 mb-10 fade-in-up">
+    <div class="flex justify-between text-sm mb-2">
+      <span class="text-gray-300">ความคืบหน้าทั้งหมด</span>
+      <span id="overall-progress-text" class="font-semibold text-[#a855f7]"></span>
+    </div>
+    <div class="progress-track h-3">
+      <div id="overall-progress-fill" class="progress-fill" style="width:0%"></div>
+    </div>
+    <div class="flex justify-between text-xs text-gray-500 mt-2">
+      <span id="range-start"></span>
+      <span id="range-end"></span>
+    </div>
+  </div>
+
+  <!-- WEEK CARDS -->
+  <div id="week-grid" class="grid grid-cols-3 md:grid-cols-6 gap-4"></div>
+
+  <!-- WEEK DETAIL AREA -->
+  <div id="week-detail" class="hidden mt-10"></div>
+</section>
+
+<footer class="bg-[#120e1c] text-center py-10 px-6">
+  <div class="heading text-2xl text-[#a855f7]" data-college-th></div>
+  <div class="text-gray-300 text-sm mb-4" data-college-en></div>
+  <div class="text-sm text-gray-300 space-y-1">
+    <div>📍 <span data-address></span></div>
+    <div>📞 <span data-phone></span></div>
+  </div>
+</footer>
+
+<button id="back-to-top" aria-label="กลับขึ้นด้านบน">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 15l-6-6-6 6"/>
+  </svg>
+</button>
+
+<script src="data.js"></script>
+<script src="firebase-sync.js"></script>
+<script src="common.js"></script>
+<script>
+window.dataReady.then(() => {
+  const weeks = generateWeeks();
+  const start = new Date(SITE.startDate + "T00:00:00");
+  const end = new Date(SITE.endDate + "T00:00:00");
+
+  document.getElementById('range-start').textContent = `เริ่ม ${formatThaiShort(start)}`;
+  document.getElementById('range-end').textContent = `จบ ${formatThaiDate(end)}`;
+
+  const completedWeeks = weeks.filter(w => w.progress >= 100).length;
+  document.getElementById('overall-progress-text').textContent = `${completedWeeks} / ${weeks.length} สัปดาห์`;
+  document.getElementById('overall-progress-fill').style.width = `${(completedWeeks/weeks.length)*100}%`;
+
+  // งานตัวอย่างเมื่อยังไม่มีข้อมูลจริงของวันนั้น ๆ ใน data.js (WEEK_DETAILS)
+  const DEFAULT_DAY = {
+    photos: [],
+    jobTasks: ["ปฏิบัติงานตามที่ได้รับมอบหมายจากพี่เลี้ยง"],
+    otherTasks: ["บันทึกสรุปงานประจำวัน"]
+  };
+
+  const grid = document.getElementById('week-grid');
+  const detail = document.getElementById('week-detail');
+
+  weeks.forEach(w => {
+    const card = document.createElement('button');
+    card.className = 'soft-card p-5 text-left hover:shadow-lg hover:-translate-y-1 transition fade-in-up';
+    card.innerHTML = `
+      <div class="text-xs text-gray-500">สัปดาห์ที่</div>
+      <div class="heading text-4xl text-white">${w.no}</div>
+      <div class="text-xs text-gray-400 mt-1">${formatThaiShort(w.start)} - ${formatThaiShort(w.end)}</div>
+      <div class="progress-track h-1.5 mt-3">
+        <div class="progress-fill" style="width:${w.progress}%"></div>
+      </div>
+    `;
+    card.addEventListener('click', () => showWeekDetail(w));
+    grid.appendChild(card);
+  });
+
+  // สำคัญ: เรียกซ้ำเพื่อให้การ์ดที่เพิ่งสร้างขึ้นมาถูกจับตาแสดงผล (ไม่งั้นจะค้างมองไม่เห็น)
+  if (window.initFadeIn) window.initFadeIn();
+
+  // แปลง "2026-03-09" เป็นรูปแบบ 09/03/2569
+  function formatSlashDate(dateStr) {
+    const d = new Date(dateStr + "T00:00:00");
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = toBuddhistYear(d);
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  function taskListHtml(title, items) {
+    if (!items || items.length === 0) return '';
+    return `
+      <div class="mb-4">
+        <div class="font-semibold text-white underline decoration-[#a855f7] decoration-2 underline-offset-4 mb-2">${title}</div>
+        <ul class="space-y-1.5">
+          ${items.map(t => `
+            <li class="flex items-start gap-2 text-gray-200 text-sm">
+              <span class="text-[#a855f7] mt-1">▪</span><span>${t}</span>
+            </li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
+  function carouselHtml(dayIdx, photos) {
+    if (!photos || photos.length === 0) {
+      return `<div class="w-full aspect-square md:aspect-[4/5] rounded-2xl bg-gray-800 flex items-center justify-center text-gray-500 text-sm text-center p-4">ยังไม่มีรูปภาพ<br>เพิ่มได้ที่ img/ แล้วแก้ WEEK_DETAILS ใน data.js</div>`;
+    }
+    const slides = photos.map((p, i) => `<img src="${p}" class="carousel-slide w-full aspect-square md:aspect-[4/5] object-cover rounded-2xl ${i===0?'':'hidden'}" data-day="${dayIdx}" data-idx="${i}">`).join('');
+    const dots = photos.map((_, i) => `<span class="carousel-dot w-2 h-2 rounded-full ${i===0?'bg-[#a855f7]':'bg-gray-700'} cursor-pointer" data-day="${dayIdx}" data-idx="${i}"></span>`).join('');
+    return `
+      <div class="relative">
+        ${slides}
+        <div class="flex justify-center gap-2 mt-3">${dots}</div>
+      </div>
+    `;
+  }
+
+  function showWeekDetail(w) {
+    const days = WEEK_DETAILS[w.no] && WEEK_DETAILS[w.no].length > 0
+      ? WEEK_DETAILS[w.no]
+      : [{ date: w.start.toISOString().slice(0,10), ...DEFAULT_DAY }];
+
+    detail.classList.remove('hidden');
+    detail.innerHTML = `
+      <div class="soft-card overflow-hidden mb-6">
+        <div class="bg-gradient-to-br from-[#a855f7] to-[#c084fc] px-8 py-10 text-center">
+          <div class="heading text-5xl text-white">สัปดาห์ที่ ${w.no}</div>
+          <div class="text-white/80 text-sm mt-1">${formatThaiDate(w.start)} - ${formatThaiDate(w.end)}</div>
+        </div>
+      </div>
+      <div class="space-y-6">
+        ${days.map((day, i) => `
+          <div class="soft-card p-6 md:p-8 grid md:grid-cols-2 gap-8 items-start">
+            <div>${carouselHtml(i, day.photos)}</div>
+            <div>
+              <div class="heading text-3xl text-white mb-2">${formatSlashDate(day.date)}</div>
+              <div class="border-t border-dashed border-gray-700 mb-4"></div>
+              ${taskListHtml("งานที่เกี่ยวกับสายงาน", day.jobTasks)}
+              ${taskListHtml("งานที่ไม่เกี่ยวกับสาย", day.otherTasks)}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    // เปิดใช้งานปุ่มจุดสำหรับสลับรูปใน carousel
+    detail.querySelectorAll('.carousel-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        const day = dot.dataset.day, idx = dot.dataset.idx;
+        detail.querySelectorAll(`.carousel-slide[data-day="${day}"]`).forEach(s => s.classList.add('hidden'));
+        detail.querySelector(`.carousel-slide[data-day="${day}"][data-idx="${idx}"]`).classList.remove('hidden');
+        detail.querySelectorAll(`.carousel-dot[data-day="${day}"]`).forEach(d => d.classList.remove('bg-[#a855f7]'));
+        detail.querySelectorAll(`.carousel-dot[data-day="${day}"]`).forEach(d => d.classList.add('bg-gray-700'));
+        dot.classList.remove('bg-gray-700');
+        dot.classList.add('bg-[#a855f7]');
+      });
+    });
+
+    detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
+</script>
+</body>
+</html>

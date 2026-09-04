@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>จัดการข้อมูล | วิทยาลัยเทคนิคเลย</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+Thai:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css">
+<style>
+  .input {
+    width: 100%; border: 1px solid #2b2440; border-radius: 12px;
+    padding: 9px 13px; font-size: 14px; background: #14101f; color: #f2eefc;
+  }
+  .input::placeholder { color: #6b6280; }
+  .input:focus { outline: none; border-color: #a855f7; box-shadow: 0 0 0 3px rgba(255,46,136,0.25), 0 0 16px rgba(255,46,136,0.35); }
+  .label { font-size: 12px; color: #9b93b0; margin-bottom: 4px; display: block; font-weight: 500; }
+  .btn-primary { color: white; padding: 10px 22px; border-radius: 12px; font-weight: 600; border: none; cursor: pointer; transition: background 0.2s, box-shadow 0.2s, transform 0.15s; }
+  .btn-outline { border: 1.5px solid #a855f7; color: #a855f7; padding: 8px 18px; border-radius: 12px; font-weight: 600; background: #1a1628; cursor: pointer; }
+  .btn-danger { color: #ff4757; font-size: 13px; font-weight: 500; }
+  .tag-textarea { min-height: 90px; }
+</style>
+</head>
+<body>
+<div id="space-bg"></div>
+
+<!-- LOADING SCREEN: ครอบไว้ตอนกำลังโหลดข้อมูลจาก Firebase กันไม่ให้เห็นหน้าที่ยังจัดเรียงไม่เสร็จ -->
+<div id="page-loader">
+  <div class="loader-logo heading">LTC</div>
+  <div class="loader-spinner"></div>
+  <div class="loader-text">กำลังโหลดข้อมูล...</div>
+</div>
+
+<div id="scroll-progress"></div>
+
+<header class="sticky top-4 z-40 px-4">
+  <nav class="nav-pill max-w-2xl mx-auto flex items-center justify-center gap-4 md:gap-6 px-6 py-3 text-sm flex-wrap">
+    <a href="index.html" class="nav-link">หน้าแรก</a>
+    <a href="log.html" class="nav-link">ลงเวลา</a>
+    <a href="tasks.html" class="nav-link">งานที่ได้มอบหมาย</a>
+    <a href="admin.html" class="nav-link active">⚙️ จัดการข้อมูล</a>
+  </nav>
+</header>
+
+<section class="max-w-4xl mx-auto px-6 pt-10 pb-24">
+  <div class="fade-in-up mb-8">
+    <h1 class="heading text-5xl text-white">จัดการข้อมูล</h1>
+    <div class="w-16 h-1.5 bg-[#a855f7] rounded-full my-3"></div>
+    <p class="text-gray-300">กรอกข้อมูลตรงนี้ได้เลย ไม่ต้องแก้โค้ด — ข้อมูลจะถูกบันทึกขึ้น<b>คลาวด์กลาง</b>โดยอัตโนมัติ</p>
+    <div class="bg-[#0d2818] border border-[#16a34a] text-[#4ade80] text-sm rounded-xl px-4 py-3 mt-4">
+      ✅ <b>ข้อมูลที่กรอกที่นี่ ทุกคนที่เข้าเว็บจะเห็นเหมือนกันทันที</b> ไม่ว่าจะเปิดจากเครื่องหรือเบราว์เซอร์ไหนก็ตาม
+      เพราะข้อมูลถูกบันทึกไว้บนฐานข้อมูลกลาง (Firebase) ไม่ใช่แค่ในเครื่องนี้อีกต่อไป
+    </div>
+  </div>
+
+  <!-- TAB NAV -->
+  <div class="flex gap-2 mb-8 fade-in-up flex-wrap">
+    <button class="tab-btn btn-outline" data-tab="tab-site">ข้อมูลเว็บไซต์</button>
+    <button class="tab-btn btn-outline" data-tab="tab-members">สมาชิก</button>
+    <button class="tab-btn btn-outline" data-tab="tab-timelog">ลงเวลา</button>
+    <button class="tab-btn btn-outline" data-tab="tab-tasks">งานรายสัปดาห์</button>
+  </div>
+
+  <!-- ===== TAB: SITE INFO ===== -->
+  <div id="tab-site" class="tab-panel soft-card p-6 md:p-8 space-y-4 fade-in-up show">
+    <h2 class="heading text-2xl text-[#a855f7] mb-2">ข้อมูลเว็บไซต์</h2>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div><span class="label">ชื่อวิทยาลัย (ไทย)</span><input id="f-collegeNameTh" class="input"></div>
+      <div><span class="label">ชื่อวิทยาลัย (อังกฤษ)</span><input id="f-collegeNameEn" class="input"></div>
+      <div><span class="label">ที่อยู่</span><input id="f-address" class="input"></div>
+      <div><span class="label">เบอร์โทร</span><input id="f-phone" class="input"></div>
+      <div><span class="label">ชื่อรุ่นฝึกงาน</span><input id="f-batchTitle" class="input"></div>
+      <div></div>
+      <div><span class="label">วันเริ่มฝึกงาน</span><input id="f-startDate" type="date" class="input"></div>
+      <div><span class="label">วันสิ้นสุดฝึกงาน</span><input id="f-endDate" type="date" class="input"></div>
+      <div><span class="label">เวลาเข้างาน</span><input id="f-dailyStart" type="time" class="input"></div>
+      <div><span class="label">เวลาออกงาน</span><input id="f-dailyEnd" type="time" class="input"></div>
+    </div>
+    <div class="pt-2">
+      <span class="label">รูปอาคาร / ภาพหลักหน้าแรก</span>
+      <input type="file" accept="image/*" id="f-heroImage" class="input">
+      <div id="hero-preview" class="mt-2"></div>
+    </div>
+    <div class="pt-2">
+      <span class="label">รูปแบนเนอร์ "เด็กฝึกงาน" (รูปเต็มกรอบด้านบนสุดของหน้าแรก)</span>
+      <input type="file" accept="image/*" id="f-bannerImage" class="input">
+      <div id="banner-preview" class="mt-2"></div>
+    </div>
+    <button id="save-site" class="btn-primary mt-2">💾 บันทึกข้อมูลเว็บไซต์</button>
+    <span id="save-site-msg" class="text-green-600 text-sm ml-2"></span>
+  </div>
+
+  <!-- ===== TAB: MEMBERS ===== -->
+  <div id="tab-members" class="tab-panel soft-card p-6 md:p-8 space-y-4 hidden fade-in-up">
+    <h2 class="heading text-2xl text-[#a855f7] mb-2">สมาชิก</h2>
+    <div id="member-form-list" class="space-y-4"></div>
+    <button id="add-member" class="btn-outline">+ เพิ่มสมาชิก</button>
+    <div class="pt-2">
+      <button id="save-members" class="btn-primary">💾 บันทึกรายชื่อสมาชิก</button>
+      <span id="save-members-msg" class="text-green-600 text-sm ml-2"></span>
+    </div>
+  </div>
+
+  <!-- ===== TAB: TIME LOG ===== -->
+  <div id="tab-timelog" class="tab-panel soft-card p-6 md:p-8 space-y-4 hidden fade-in-up">
+    <h2 class="heading text-2xl text-[#a855f7] mb-2">ลงเวลา</h2>
+    <p class="text-sm text-gray-400 mb-2">กรอกเวลาเข้า-ออกจริงของแต่ละคนแต่ละวัน ถ้าวันไหนไม่กรอก ระบบจะคำนวณให้อัตโนมัติ (เข้า 08:30 ออก 16:30 ทุกวันทำการ เสาร์-อาทิตย์ = วันหยุด)</p>
+
+    <div class="grid md:grid-cols-4 gap-3 items-end border border-[#2b2440] rounded-xl p-4">
+      <div>
+        <span class="label">สมาชิก</span>
+        <select id="tl-member" class="input"></select>
+      </div>
+      <div>
+        <span class="label">วันที่</span>
+        <input type="date" id="tl-date" class="input">
+      </div>
+      <div>
+        <span class="label">เวลาเข้า</span>
+        <input type="time" id="tl-checkin" class="input">
+      </div>
+      <div>
+        <span class="label">เวลาออก</span>
+        <input type="time" id="tl-checkout" class="input">
+      </div>
+      <div class="md:col-span-3">
+        <span class="label">หมายเหตุ (ไม่บังคับ เช่น ลาป่วย, ทำงานล่วงเวลา)</span>
+        <input type="text" id="tl-note" class="input" placeholder="เว้นว่างไว้ได้ถ้าไม่มี">
+      </div>
+      <div>
+        <button id="tl-save" class="btn-primary w-full">💾 บันทึกวันนี้</button>
+      </div>
+    </div>
+    <span id="tl-save-msg" class="text-green-600 text-sm"></span>
+
+    <div class="mt-6">
+      <div class="font-medium text-gray-200 mb-2">รายการเวลาที่กรอกไว้ (<span id="tl-count">0</span> รายการ)</div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-[#1a1330] text-[#a855f7] text-left">
+              <th class="px-3 py-2">ชื่อ</th>
+              <th class="px-3 py-2">วันที่</th>
+              <th class="px-3 py-2">เข้า</th>
+              <th class="px-3 py-2">ออก</th>
+              <th class="px-3 py-2">รวม (ชม.)</th>
+              <th class="px-3 py-2">หมายเหตุ</th>
+              <th class="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody id="tl-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: WEEK TASKS ===== -->
+  <div id="tab-tasks" class="tab-panel soft-card p-6 md:p-8 space-y-4 hidden fade-in-up">
+    <h2 class="heading text-2xl text-[#a855f7] mb-2">งานรายสัปดาห์</h2>
+    <div>
+      <span class="label">เลือกสัปดาห์ที่</span>
+      <select id="week-select" class="input max-w-xs"></select>
+    </div>
+    <div id="day-form-list" class="space-y-6 mt-4"></div>
+    <button id="add-day" class="btn-outline">+ เพิ่มวัน</button>
+    <div class="pt-2">
+      <button id="save-tasks" class="btn-primary">💾 บันทึกงานสัปดาห์นี้</button>
+      <span id="save-tasks-msg" class="text-green-600 text-sm ml-2"></span>
+    </div>
+  </div>
+
+  <!-- RESET / EXPORT -->
+  <div class="soft-card p-6 mt-8 fade-in-up flex flex-wrap gap-3 items-center justify-between">
+    <div>
+      <div class="font-medium text-gray-200">ตัวเลือกเพิ่มเติม</div>
+      <div class="text-sm text-gray-400">ล้างข้อมูลที่กรอกไว้ หรือส่งออกเป็นโค้ดสำหรับใส่ใน data.js ถาวร</div>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <button id="export-code" class="btn-outline">📋 ส่งออกเป็นโค้ด</button>
+      <button id="reset-all" class="btn-outline text-red-500 border-red-500 hover:bg-red-950">🗑 ล้างข้อมูลทั้งหมด</button>
+    </div>
+  </div>
+
+  <!-- EXPORT MODAL -->
+  <div id="export-box" class="soft-card p-6 mt-6 hidden">
+    <div class="font-medium text-gray-200 mb-2">คัดลอกโค้ดด้านล่าง แล้วนำไปแทนที่ตัวแปรเดิมในไฟล์ data.js เพื่อให้ข้อมูลนี้แสดงกับทุกคนที่เข้าเว็บ</div>
+    <textarea id="export-textarea" class="input font-mono text-xs" style="height:300px;" readonly></textarea>
+  </div>
+
+</section>
+
+<footer class="bg-[#120e1c] text-center py-10 px-6">
+  <div class="heading text-2xl text-[#a855f7]" data-college-th></div>
+  <div class="text-gray-300 text-sm mb-4" data-college-en></div>
+</footer>
+
+<button id="back-to-top" aria-label="กลับขึ้นด้านบน">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 15l-6-6-6 6"/>
+  </svg>
+</button>
+
+<script src="data.js"></script>
+<script src="firebase-sync.js"></script>
+<script src="common.js"></script>
+<script>
+window.dataReady.then(() => {
+  // ===== TAB SWITCHING =====
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabPanels.forEach(p => p.classList.add('hidden'));
+      document.getElementById(btn.dataset.tab).classList.remove('hidden');
+      tabBtns.forEach(b => b.classList.remove('btn-outline-active'));
+      btn.classList.add('btn-outline-active');
+    });
+  });
+  tabBtns[0].click();
+
+  // ===== TAB 1: SITE INFO =====
+  let heroImageDraft = SITE.heroImage || "";
+  let bannerImageDraft = SITE.bannerImage || "";
+
+  function loadSiteForm() {
+    document.getElementById('f-collegeNameTh').value = SITE.collegeNameTh;
+    document.getElementById('f-collegeNameEn').value = SITE.collegeNameEn;
+    document.getElementById('f-address').value = SITE.address;
+    document.getElementById('f-phone').value = SITE.phone;
+    document.getElementById('f-batchTitle').value = SITE.batchTitle;
+    document.getElementById('f-startDate').value = SITE.startDate;
+    document.getElementById('f-endDate').value = SITE.endDate;
+    document.getElementById('f-dailyStart').value = SITE.dailyStart;
+    document.getElementById('f-dailyEnd').value = SITE.dailyEnd;
+    renderHeroPreview();
+    renderBannerPreview();
+  }
+  loadSiteForm();
+
+  function renderHeroPreview() {
+    const box = document.getElementById('hero-preview');
+    box.innerHTML = heroImageDraft
+      ? `<img src="${heroImageDraft}" class="w-48 aspect-video object-cover rounded-xl">`
+      : `<span class="text-xs text-gray-500">ยังไม่มีรูป</span>`;
+  }
+
+  function renderBannerPreview() {
+    const box = document.getElementById('banner-preview');
+    box.innerHTML = bannerImageDraft
+      ? `<img src="${bannerImageDraft}" class="w-48 aspect-video object-cover rounded-xl">`
+      : `<span class="text-xs text-gray-500">ยังไม่มีรูป (จะใช้พื้นหลังไล่สีแทน)</span>`;
+  }
+
+  document.getElementById('f-heroImage').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { heroImageDraft = reader.result; renderHeroPreview(); };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('f-bannerImage').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { bannerImageDraft = reader.result; renderBannerPreview(); };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('save-site').addEventListener('click', async () => {
+    const updated = {
+      collegeNameTh: document.getElementById('f-collegeNameTh').value,
+      collegeNameEn: document.getElementById('f-collegeNameEn').value,
+      address: document.getElementById('f-address').value,
+      phone: document.getElementById('f-phone').value,
+      batchTitle: document.getElementById('f-batchTitle').value,
+      startDate: document.getElementById('f-startDate').value,
+      endDate: document.getElementById('f-endDate').value,
+      dailyStart: document.getElementById('f-dailyStart').value,
+      dailyEnd: document.getElementById('f-dailyEnd').value,
+      dailyHours: SITE.dailyHours,
+      heroImage: heroImageDraft,
+      bannerImage: bannerImageDraft
+    };
+    const ok = await saveCloudData('site', updated);
+    if (ok) {
+      Object.assign(SITE, updated);
+      flashMsg('save-site-msg');
+    }
+  });
+
+  // ===== TAB 2: MEMBERS =====
+  let membersDraft = JSON.parse(JSON.stringify(MEMBERS));
+  const memberListEl = document.getElementById('member-form-list');
+
+  function renderMembers() {
+    memberListEl.innerHTML = '';
+    membersDraft.forEach((m, i) => {
+      const row = document.createElement('div');
+      row.className = 'border border-[#2b2440] rounded-xl p-4';
+      row.innerHTML = `
+        <div class="grid md:grid-cols-2 gap-3">
+          <div><span class="label">ชื่อ-นามสกุล</span><input class="input m-name" data-i="${i}" value="${m.name}"></div>
+          <div><span class="label">รหัสนักศึกษา</span><input class="input m-id" data-i="${i}" value="${m.id}"></div>
+          <div><span class="label">เบอร์โทร</span><input class="input m-phone" data-i="${i}" value="${m.phone}"></div>
+          <div>
+            <span class="label">ตำแหน่ง</span>
+            <select class="input m-role" data-i="${i}">
+              <option value="member" ${m.role==='member'?'selected':''}>สมาชิก</option>
+              <option value="head" ${m.role==='head'?'selected':''}>หัวหน้างาน</option>
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <span class="label">รูปโปรไฟล์ (ไม่ใส่ก็ได้)</span>
+            <input type="file" accept="image/*" class="input m-photo" data-i="${i}">
+            ${m.photo ? `<img src="${m.photo}" class="w-16 h-16 rounded-lg object-cover mt-2">` : ''}
+          </div>
+        </div>
+        <button class="btn-danger mt-3" data-remove="${i}">🗑 ลบสมาชิกคนนี้</button>
+      `;
+      memberListEl.appendChild(row);
+    });
+
+    memberListEl.querySelectorAll('.m-name').forEach(el => el.addEventListener('input', e => membersDraft[e.target.dataset.i].name = e.target.value));
+    memberListEl.querySelectorAll('.m-id').forEach(el => el.addEventListener('input', e => membersDraft[e.target.dataset.i].id = e.target.value));
+    memberListEl.querySelectorAll('.m-phone').forEach(el => el.addEventListener('input', e => membersDraft[e.target.dataset.i].phone = e.target.value));
+    memberListEl.querySelectorAll('.m-role').forEach(el => el.addEventListener('change', e => membersDraft[e.target.dataset.i].role = e.target.value));
+    memberListEl.querySelectorAll('.m-photo').forEach(el => el.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { membersDraft[e.target.dataset.i].photo = reader.result; renderMembers(); };
+      reader.readAsDataURL(file);
+    }));
+    memberListEl.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', () => {
+      membersDraft.splice(parseInt(el.dataset.remove), 1);
+      renderMembers();
+    }));
+  }
+  renderMembers();
+
+  document.getElementById('add-member').addEventListener('click', () => {
+    membersDraft.push({ id: '', name: '', role: 'member', phone: '', photo: '' });
+    renderMembers();
+  });
+
+  document.getElementById('save-members').addEventListener('click', async () => {
+    const ok = await saveCloudData('members', membersDraft);
+    if (ok) {
+      MEMBERS.length = 0;
+      membersDraft.forEach(m => MEMBERS.push(m));
+      flashMsg('save-members-msg');
+    }
+  });
+
+  // ===== TAB 3: TIME LOG =====
+  let timeLogDraft = JSON.parse(JSON.stringify(TIME_LOG_OVERRIDES));
+
+  const tlMemberEl = document.getElementById('tl-member');
+  MEMBERS.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name;
+    tlMemberEl.appendChild(opt);
+  });
+  document.getElementById('tl-date').value = SITE.startDate;
+  document.getElementById('tl-checkin').value = SITE.dailyStart;
+  document.getElementById('tl-checkout').value = SITE.dailyEnd;
+
+  function renderTimeLogTable() {
+    const tbody = document.getElementById('tl-tbody');
+    tbody.innerHTML = '';
+    const keys = Object.keys(timeLogDraft).sort();
+    document.getElementById('tl-count').textContent = keys.length;
+    keys.forEach(key => {
+      const [name, dateStr] = key.split('|');
+      const entry = timeLogDraft[key];
+      const hours = computeHoursFromTimes(entry.checkIn, entry.checkOut);
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-gray-800';
+      tr.innerHTML = `
+        <td class="px-3 py-2">${name}</td>
+        <td class="px-3 py-2">${dateStr}</td>
+        <td class="px-3 py-2">${entry.checkIn || '-'}</td>
+        <td class="px-3 py-2">${entry.checkOut || '-'}</td>
+        <td class="px-3 py-2">${hours.toFixed(2)}</td>
+        <td class="px-3 py-2 text-gray-400">${entry.note || '-'}</td>
+        <td class="px-3 py-2"><button class="btn-danger" data-key="${key}">🗑</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll('[data-key]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        delete timeLogDraft[btn.dataset.key];
+        persistTimeLog();
+        renderTimeLogTable();
+      });
+    });
+  }
+  renderTimeLogTable();
+
+  async function persistTimeLog() {
+    const ok = await saveCloudData('timeLogOverrides', timeLogDraft);
+    if (ok) {
+      Object.keys(TIME_LOG_OVERRIDES).forEach(k => delete TIME_LOG_OVERRIDES[k]);
+      Object.keys(timeLogDraft).forEach(k => TIME_LOG_OVERRIDES[k] = timeLogDraft[k]);
+    }
+    return ok;
+  }
+
+  document.getElementById('tl-save').addEventListener('click', async () => {
+    const name = tlMemberEl.value;
+    const dateStr = document.getElementById('tl-date').value;
+    const checkIn = document.getElementById('tl-checkin').value;
+    const checkOut = document.getElementById('tl-checkout').value;
+    const note = document.getElementById('tl-note').value;
+    if (!dateStr) { alert('กรุณาเลือกวันที่'); return; }
+
+    timeLogDraft[timeLogKey(name, dateStr)] = { checkIn, checkOut, note };
+    const ok = await persistTimeLog();
+    renderTimeLogTable();
+    if (ok) flashMsg('tl-save-msg');
+
+    // เลื่อนวันที่ไปวันถัดไปให้อัตโนมัติ เพื่อกรอกต่อได้เร็วขึ้น
+    const nextDate = new Date(dateStr + "T00:00:00");
+    nextDate.setDate(nextDate.getDate() + 1);
+    document.getElementById('tl-date').value = nextDate.toISOString().slice(0, 10);
+    document.getElementById('tl-checkin').value = SITE.dailyStart;
+    document.getElementById('tl-checkout').value = SITE.dailyEnd;
+    document.getElementById('tl-note').value = '';
+  });
+
+  // ===== TAB 3: WEEK TASKS =====
+  const weeks = generateWeeks();
+  const weekSelectEl = document.getElementById('week-select');
+  weeks.forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w.no;
+    opt.textContent = `สัปดาห์ที่ ${w.no} (${formatThaiShort(w.start)} - ${formatThaiShort(w.end)})`;
+    weekSelectEl.appendChild(opt);
+  });
+
+  let currentWeekDraft = [];
+  const dayFormList = document.getElementById('day-form-list');
+
+  function loadWeekDraft() {
+    const wk = weekSelectEl.value;
+    currentWeekDraft = JSON.parse(JSON.stringify(WEEK_DETAILS[wk] || []));
+    renderDays();
+  }
+
+  function renderDays() {
+    dayFormList.innerHTML = '';
+    currentWeekDraft.forEach((d, i) => {
+      const box = document.createElement('div');
+      box.className = 'border border-[#2b2440] rounded-xl p-4';
+      box.innerHTML = `
+        <div class="grid md:grid-cols-2 gap-3 mb-3">
+          <div><span class="label">วันที่</span><input type="date" class="input d-date" data-i="${i}" value="${d.date}"></div>
+        </div>
+        <div class="mb-3">
+          <span class="label">รูปภาพ (เลือกได้หลายรูป)</span>
+          <input type="file" accept="image/*" multiple class="input d-photo" data-i="${i}">
+          <div class="flex gap-2 flex-wrap mt-2">
+            ${(d.photos||[]).map((p, pi) => `
+              <div class="relative">
+                <img src="${p}" class="w-16 h-16 rounded-lg object-cover">
+                <button data-day="${i}" data-photo="${pi}" class="d-photo-remove absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-5">×</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-3">
+          <div>
+            <span class="label">งานที่เกี่ยวกับสายงาน (พิมพ์บรรทัดละ 1 งาน)</span>
+            <textarea class="input tag-textarea d-job" data-i="${i}">${(d.jobTasks||[]).join('\\n')}</textarea>
+          </div>
+          <div>
+            <span class="label">งานที่ไม่เกี่ยวกับสาย (พิมพ์บรรทัดละ 1 งาน)</span>
+            <textarea class="input tag-textarea d-other" data-i="${i}">${(d.otherTasks||[]).join('\\n')}</textarea>
+          </div>
+        </div>
+        <button class="btn-danger mt-3" data-remove-day="${i}">🗑 ลบวันนี้</button>
+      `;
+      dayFormList.appendChild(box);
+    });
+
+    dayFormList.querySelectorAll('.d-date').forEach(el => el.addEventListener('input', e => currentWeekDraft[e.target.dataset.i].date = e.target.value));
+    dayFormList.querySelectorAll('.d-job').forEach(el => el.addEventListener('input', e => currentWeekDraft[e.target.dataset.i].jobTasks = e.target.value.split('\n').map(s=>s.trim()).filter(Boolean)));
+    dayFormList.querySelectorAll('.d-other').forEach(el => el.addEventListener('input', e => currentWeekDraft[e.target.dataset.i].otherTasks = e.target.value.split('\n').map(s=>s.trim()).filter(Boolean)));
+    dayFormList.querySelectorAll('.d-photo').forEach(el => el.addEventListener('change', e => {
+      const files = Array.from(e.target.files);
+      const idx = e.target.dataset.i;
+      let loaded = 0;
+      if (!currentWeekDraft[idx].photos) currentWeekDraft[idx].photos = [];
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          currentWeekDraft[idx].photos.push(reader.result);
+          loaded++;
+          if (loaded === files.length) renderDays();
+        };
+        reader.readAsDataURL(file);
+      });
+    }));
+    dayFormList.querySelectorAll('.d-photo-remove').forEach(el => el.addEventListener('click', () => {
+      const day = el.dataset.day, photo = el.dataset.photo;
+      currentWeekDraft[day].photos.splice(photo, 1);
+      renderDays();
+    }));
+    dayFormList.querySelectorAll('[data-remove-day]').forEach(el => el.addEventListener('click', () => {
+      currentWeekDraft.splice(parseInt(el.dataset.removeDay), 1);
+      renderDays();
+    }));
+  }
+
+  weekSelectEl.addEventListener('change', loadWeekDraft);
+  loadWeekDraft();
+
+  document.getElementById('add-day').addEventListener('click', () => {
+    currentWeekDraft.push({ date: SITE.startDate, photos: [], jobTasks: [], otherTasks: [] });
+    renderDays();
+  });
+
+  document.getElementById('save-tasks').addEventListener('click', async () => {
+    WEEK_DETAILS[weekSelectEl.value] = currentWeekDraft;
+    const ok = await saveCloudData('weekDetails', WEEK_DETAILS);
+    if (ok) flashMsg('save-tasks-msg');
+  });
+
+  // ===== HELPERS =====
+  function flashMsg(id) {
+    const el = document.getElementById(id);
+    el.textContent = '✓ บันทึกแล้ว';
+    setTimeout(() => el.textContent = '', 2000);
+  }
+
+  document.getElementById('export-code').addEventListener('click', () => {
+    const code =
+`// ===== วางแทนที่ตัวแปรเดิมในไฟล์ data.js =====
+
+const SITE = ${JSON.stringify(SITE, null, 2)};
+
+const MEMBERS = ${JSON.stringify(MEMBERS, null, 2)};
+
+const WEEK_DETAILS = ${JSON.stringify(WEEK_DETAILS, null, 2)};
+
+const TIME_LOG_OVERRIDES = ${JSON.stringify(TIME_LOG_OVERRIDES, null, 2)};
+`;
+    document.getElementById('export-textarea').value = code;
+    document.getElementById('export-box').classList.remove('hidden');
+    document.getElementById('export-box').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  document.getElementById('reset-all').addEventListener('click', async () => {
+    if (!confirm('ล้างข้อมูลที่กรอกไว้ทั้งหมด (ที่ทุกคนเห็น) และกลับไปใช้ค่าเริ่มต้นจากโค้ด แน่ใจไหม? การกระทำนี้ย้อนกลับไม่ได้')) return;
+    const ok = await clearCloudData();
+    if (ok) location.reload();
+  });
+});
+</script>
+</body>
+</html>
