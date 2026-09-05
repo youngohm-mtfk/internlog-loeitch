@@ -52,9 +52,24 @@ function loadLocalCache() {
 }
 
 // เก็บข้อมูลล่าสุดจาก Firebase ไว้เป็นแคช ให้ครั้งต่อไปโหลดเร็วขึ้น
+// ป้องกันไว้: ถ้าข้อมูลก้อนใหญ่เกินไป (เช่น มีรูปภาพฝังแบบ base64 อยู่เยอะ) จะ "ข้ามการแคช" ไปเลย
+// เพราะการเขียนข้อความยาว ๆ ลง localStorage เป็นงานที่ทำงานแบบ synchronous (บล็อกหน้าจอชั่วขณะ)
+// ถ้าฝืนแคชข้อมูลก้อนใหญ่ จะยิ่งทำให้เว็บหน่วงกว่าตอนไม่มีแคชเสียอีก
+const MAX_CACHE_SIZE = 800000; // ประมาณ 800KB ต่อการแคช 1 ครั้ง (ปรับได้ตามความเหมาะสม)
+
 function saveLocalCache(cloud) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cloud));
+    const json = JSON.stringify(cloud);
+    if (json.length > MAX_CACHE_SIZE) {
+      console.warn(
+        `ข้อมูลใหญ่เกินไป (${(json.length / 1024).toFixed(0)} KB) จึงข้ามการแคชไว้ในเครื่อง ` +
+        `เพื่อไม่ให้หน้าเว็บหน่วง — สาเหตุมักมาจากรูปภาพที่ฝังเป็น base64 ในฐานข้อมูล ` +
+        `แนะนำให้เปลี่ยนไปใช้ไฟล์รูปจริงแทนเพื่อความเร็วที่ดีขึ้นถาวร`
+      );
+      localStorage.removeItem(CACHE_KEY); // ล้างแคชเก่าทิ้งด้วย กันค้างข้อมูลไม่ตรงกัน
+      return;
+    }
+    localStorage.setItem(CACHE_KEY, json);
   } catch (e) {
     console.warn('บันทึกแคชไม่สำเร็จ (พื้นที่ localStorage อาจเต็ม)', e);
   }

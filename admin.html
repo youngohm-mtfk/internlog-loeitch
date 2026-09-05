@@ -211,6 +211,43 @@
 <script src="firebase-sync.js"></script>
 <script src="common.js"></script>
 <script>
+// ===================================================
+// บีบอัด/ย่อขนาดรูปภาพก่อนแปลงเป็น base64 ฝังในฐานข้อมูล
+// เหตุผล: รูปจากมือถือ/กล้องมักมีขนาด 2-5 MB ต่อรูป ถ้าฝังตรง ๆ ลง Firebase
+// จะทำให้ไฟล์ข้อมูลบวมมาก โหลดช้าทุกครั้งไม่ว่าใครเข้าเว็บ
+// ฟังก์ชันนี้จะย่อรูปให้เหลือกว้างไม่เกิน maxDimension px แล้วบีบอัดคุณภาพ (quality)
+// ก่อนแปลงเป็น base64 ทำให้ขนาดเล็กลงมาก (มักเหลือแค่ไม่กี่สิบ-ร้อย KB) โดยยังดูดีอยู่
+// คืนค่าเป็น Promise<string> (base64 dataURL)
+function compressImageFile(file, maxDimension = 1200, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('อ่านไฟล์รูปไม่สำเร็จ'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('โหลดรูปไม่สำเร็จ'));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round(height * (maxDimension / width));
+            width = maxDimension;
+          } else {
+            width = Math.round(width * (maxDimension / height));
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 window.dataReady.then(() => {
   // ===== TAB SWITCHING =====
   const tabBtns = document.querySelectorAll('.tab-btn');
@@ -258,20 +295,18 @@ window.dataReady.then(() => {
       : `<span class="text-xs text-gray-500">ยังไม่มีรูป (จะใช้พื้นหลังไล่สีแทน)</span>`;
   }
 
-  document.getElementById('f-heroImage').addEventListener('change', (e) => {
+  document.getElementById('f-heroImage').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { heroImageDraft = reader.result; renderHeroPreview(); };
-    reader.readAsDataURL(file);
+    heroImageDraft = await compressImageFile(file);
+    renderHeroPreview();
   });
 
-  document.getElementById('f-bannerImage').addEventListener('change', (e) => {
+  document.getElementById('f-bannerImage').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { bannerImageDraft = reader.result; renderBannerPreview(); };
-    reader.readAsDataURL(file);
+    bannerImageDraft = await compressImageFile(file);
+    renderBannerPreview();
   });
 
   document.getElementById('save-site').addEventListener('click', async () => {
@@ -332,12 +367,11 @@ window.dataReady.then(() => {
     memberListEl.querySelectorAll('.m-id').forEach(el => el.addEventListener('input', e => membersDraft[e.target.dataset.i].id = e.target.value));
     memberListEl.querySelectorAll('.m-phone').forEach(el => el.addEventListener('input', e => membersDraft[e.target.dataset.i].phone = e.target.value));
     memberListEl.querySelectorAll('.m-role').forEach(el => el.addEventListener('change', e => membersDraft[e.target.dataset.i].role = e.target.value));
-    memberListEl.querySelectorAll('.m-photo').forEach(el => el.addEventListener('change', e => {
+    memberListEl.querySelectorAll('.m-photo').forEach(el => el.addEventListener('change', async e => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => { membersDraft[e.target.dataset.i].photo = reader.result; renderMembers(); };
-      reader.readAsDataURL(file);
+      membersDraft[e.target.dataset.i].photo = await compressImageFile(file, 500, 0.75);
+      renderMembers();
     }));
     memberListEl.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', () => {
       membersDraft.splice(parseInt(el.dataset.remove), 1);
@@ -516,20 +550,13 @@ window.dataReady.then(() => {
     dayFormList.querySelectorAll('.d-date').forEach(el => el.addEventListener('input', e => currentWeekDraft[e.target.dataset.i].date = e.target.value));
     dayFormList.querySelectorAll('.d-job').forEach(el => el.addEventListener('input', e => currentWeekDraft[e.target.dataset.i].jobTasks = e.target.value.split('\n').map(s=>s.trim()).filter(Boolean)));
     dayFormList.querySelectorAll('.d-other').forEach(el => el.addEventListener('input', e => currentWeekDraft[e.target.dataset.i].otherTasks = e.target.value.split('\n').map(s=>s.trim()).filter(Boolean)));
-    dayFormList.querySelectorAll('.d-photo').forEach(el => el.addEventListener('change', e => {
+    dayFormList.querySelectorAll('.d-photo').forEach(el => el.addEventListener('change', async e => {
       const files = Array.from(e.target.files);
       const idx = e.target.dataset.i;
-      let loaded = 0;
       if (!currentWeekDraft[idx].photos) currentWeekDraft[idx].photos = [];
-      files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          currentWeekDraft[idx].photos.push(reader.result);
-          loaded++;
-          if (loaded === files.length) renderDays();
-        };
-        reader.readAsDataURL(file);
-      });
+      const compressed = await Promise.all(files.map(file => compressImageFile(file, 1000, 0.7)));
+      currentWeekDraft[idx].photos.push(...compressed);
+      renderDays();
     }));
     dayFormList.querySelectorAll('.d-photo-remove').forEach(el => el.addEventListener('click', () => {
       const day = el.dataset.day, photo = el.dataset.photo;
