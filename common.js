@@ -107,9 +107,12 @@ if (backToTop) {
 // สร้าง element ที่มีคลาส .fade-in-up ขึ้นมาทีหลัง (หลังโหลดข้อมูลจากคลาวด์เสร็จ)
 // ถ้าไม่เรียกซ้ำ element เหล่านั้นจะค้าง opacity:0 ตลอดไป มองไม่เห็น
 function initFadeIn() {
+  // threshold: 0 = แค่เห็นขอบของ element ไปนิดเดียวก็แสดงเลย
+  // (เดิมใช้ 0.1 = ต้องเห็น 10% ของ element ซึ่งถ้า element สูงมาก เช่น ตารางลงเวลาที่มีหลายร้อยแถว
+  //  ส่วนที่อยู่ในจอจะไม่ถึง 10% ทำให้ค้าง opacity:0 มองไม่เห็นตลอดไป)
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('show'); });
-  }, { threshold: 0.1 });
+  }, { threshold: 0 });
   document.querySelectorAll('.fade-in-up:not(.fade-in-observed)').forEach(el => {
     el.classList.add('fade-in-observed');
     observer.observe(el);

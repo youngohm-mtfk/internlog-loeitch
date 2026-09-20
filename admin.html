@@ -213,7 +213,9 @@ window.dataReady.then(() => {
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       tabPanels.forEach(p => p.classList.add('hidden'));
-      document.getElementById(btn.dataset.tab).classList.remove('hidden');
+      const panel = document.getElementById(btn.dataset.tab);
+      panel.classList.remove('hidden');
+      panel.classList.add('show'); // กันแท็บที่สูงมากค้าง opacity:0 (ดู fade-in-up ใน style.css)
       tabBtns.forEach(b => b.classList.remove('btn-outline-active'));
       btn.classList.add('btn-outline-active');
     });
