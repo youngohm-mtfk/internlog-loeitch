@@ -175,7 +175,9 @@
       <div class="font-medium text-gray-200">ตัวเลือกเพิ่มเติม</div>
       <div class="text-sm text-gray-400">ล้างข้อมูลที่กรอกไว้ หรือส่งออกเป็นโค้ดสำหรับใส่ใน data.js ถาวร</div>
     </div>
-    <div class="flex gap-2 flex-wrap">
+    <div class="flex gap-2 flex-wrap items-center">
+      <span id="shrink-msg" class="text-green-500 text-sm"></span>
+      <button id="shrink-images" class="btn-outline">🗜 บีบอัดรูปที่มีอยู่</button>
       <button id="export-code" class="btn-outline">📋 ส่งออกเป็นโค้ด</button>
       <button id="reset-all" class="btn-outline text-red-500 border-red-500 hover:bg-red-950">🗑 ล้างข้อมูลทั้งหมด</button>
     </div>
@@ -254,17 +256,17 @@ window.dataReady.then(() => {
   document.getElementById('f-heroImage').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { heroImageDraft = reader.result; renderHeroPreview(); };
-    reader.readAsDataURL(file);
+    compressImage(file, 1600, 0.8)
+      .then(url => { heroImageDraft = url; renderHeroPreview(); })
+      .catch(err => alert('ใส่รูปไม่สำเร็จ: ' + err.message));
   });
 
   document.getElementById('f-bannerImage').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { bannerImageDraft = reader.result; renderBannerPreview(); };
-    reader.readAsDataURL(file);
+    compressImage(file, 1600, 0.8)
+      .then(url => { bannerImageDraft = url; renderBannerPreview(); })
+      .catch(err => alert('ใส่รูปไม่สำเร็จ: ' + err.message));
   });
 
   document.getElementById('save-site').addEventListener('click', async () => {
@@ -328,9 +330,10 @@ window.dataReady.then(() => {
     memberListEl.querySelectorAll('.m-photo').forEach(el => el.addEventListener('change', e => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => { membersDraft[e.target.dataset.i].photo = reader.result; renderMembers(); };
-      reader.readAsDataURL(file);
+      const i = e.target.dataset.i;
+      compressImage(file, 400, 0.8)
+        .then(url => { membersDraft[i].photo = url; renderMembers(); })
+        .catch(err => alert('ใส่รูปไม่สำเร็จ: ' + err.message));
     }));
     memberListEl.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', () => {
       membersDraft.splice(parseInt(el.dataset.remove), 1);
@@ -461,9 +464,21 @@ window.dataReady.then(() => {
   let currentWeekDraft = [];
   const dayFormList = document.getElementById('day-form-list');
 
-  function loadWeekDraft() {
+  // โหลดข้อมูลสัปดาห์ที่เลือกจาก Firebase (โหลดทีละสัปดาห์ ไม่โหลดทั้งก้อนแล้ว)
+  let weekReady = false; // true เมื่อโหลดสัปดาห์ที่เลือกสำเร็จแล้ว (กันบันทึกทับข้อมูลเดิมด้วยค่าว่าง)
+  async function loadWeekDraft() {
     const wk = weekSelectEl.value;
+    weekReady = false;
+    dayFormList.innerHTML = '<div class="text-gray-400 text-sm">กำลังโหลดข้อมูลสัปดาห์นี้...</div>';
+    try {
+      await loadWeekDetails(wk);
+    } catch (e) {
+      dayFormList.innerHTML = '<div class="text-red-400 text-sm">โหลดข้อมูลสัปดาห์นี้ไม่สำเร็จ (' + e.message + ') — ยังไม่ควรกดบันทึก ลองรีเฟรชหน้าอีกครั้ง</div>';
+      return;
+    }
+    if (weekSelectEl.value !== wk) return; // ผู้ใช้เปลี่ยนสัปดาห์ระหว่างโหลด
     currentWeekDraft = JSON.parse(JSON.stringify(WEEK_DETAILS[wk] || []));
+    weekReady = true;
     renderDays();
   }
 
@@ -505,17 +520,13 @@ window.dataReady.then(() => {
     dayFormList.querySelectorAll('.d-photo').forEach(el => el.addEventListener('change', e => {
       const files = Array.from(e.target.files);
       const idx = e.target.dataset.i;
-      let loaded = 0;
       if (!currentWeekDraft[idx].photos) currentWeekDraft[idx].photos = [];
-      files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          currentWeekDraft[idx].photos.push(reader.result);
-          loaded++;
-          if (loaded === files.length) renderDays();
-        };
-        reader.readAsDataURL(file);
-      });
+      Promise.all(files.map(file => compressImage(file, 1200, 0.72)))
+        .then(urls => {
+          urls.forEach(u => currentWeekDraft[idx].photos.push(u));
+          renderDays();
+        })
+        .catch(err => alert('ใส่รูปไม่สำเร็จ: ' + err.message));
     }));
     dayFormList.querySelectorAll('.d-photo-remove').forEach(el => el.addEventListener('click', () => {
       const day = el.dataset.day, photo = el.dataset.photo;
@@ -537,8 +548,14 @@ window.dataReady.then(() => {
   });
 
   document.getElementById('save-tasks').addEventListener('click', async () => {
-    WEEK_DETAILS[weekSelectEl.value] = currentWeekDraft;
-    const ok = await saveCloudData('weekDetails', WEEK_DETAILS);
+    if (!weekReady) {
+      alert('ยังโหลดข้อมูลสัปดาห์นี้ไม่เสร็จ (หรือโหลดไม่สำเร็จ) กรุณารอหรือรีเฟรชหน้าก่อนบันทึก เพื่อไม่ให้ข้อมูลเดิมถูกทับ');
+      return;
+    }
+    const wk = weekSelectEl.value;
+    WEEK_DETAILS[wk] = currentWeekDraft;
+    // บันทึกเฉพาะสัปดาห์นี้ (ไม่เขียนทับทั้งก้อน)
+    const ok = await saveCloudData('weekDetails/' + wk, currentWeekDraft);
     if (ok) flashMsg('save-tasks-msg');
   });
 
@@ -564,6 +581,69 @@ const TIME_LOG_OVERRIDES = ${JSON.stringify(TIME_LOG_OVERRIDES, null, 2)};
     document.getElementById('export-textarea').value = code;
     document.getElementById('export-box').classList.remove('hidden');
     document.getElementById('export-box').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  // ===== บีบอัดรูปเก่าที่อยู่ในฐานข้อมูลแล้ว (ทำครั้งเดียว ช่วยลดขนาดข้อมูลและโควตา) =====
+  document.getElementById('shrink-images').addEventListener('click', async () => {
+    if (!confirm('จะบีบอัดรูปทั้งหมดที่อยู่ในฐานข้อมูล (รูปหน้าแรก แบนเนอร์ สมาชิก และรูปงานทุกสัปดาห์)\nแนะนำให้ Export JSON สำรองจาก Firebase Console ก่อน ทำต่อไหม?')) return;
+    const msg = document.getElementById('shrink-msg');
+    const THRESH = 150000; // รูปที่ยาวเกิน ~150KB ถึงจะบีบ
+    const isBig = v => typeof v === 'string' && v.startsWith('data:') && v.length > THRESH;
+    let before = 0, after = 0;
+    async function shrink(v, maxSide, q) {
+      if (!isBig(v)) return v;
+      before += v.length;
+      const out = await shrinkDataUrl(v, maxSide, q);
+      after += out.length;
+      return out;
+    }
+    try {
+      // 1) รูปเว็บไซต์
+      msg.textContent = 'กำลังบีบอัดรูปหน้าแรก/แบนเนอร์...';
+      const site = Object.assign({}, SITE);
+      site.heroImage = await shrink(site.heroImage, 1600, 0.8);
+      site.bannerImage = await shrink(site.bannerImage, 1600, 0.8);
+      if (!(await saveCloudData('site', site))) throw new Error('บันทึกข้อมูลเว็บไซต์ไม่สำเร็จ');
+      Object.assign(SITE, site);
+
+      // 2) รูปสมาชิก
+      msg.textContent = 'กำลังบีบอัดรูปสมาชิก...';
+      const members = JSON.parse(JSON.stringify(MEMBERS));
+      for (const m of members) m.photo = await shrink(m.photo, 400, 0.8);
+      if (!(await saveCloudData('members', members))) throw new Error('บันทึกข้อมูลสมาชิกไม่สำเร็จ');
+      MEMBERS.length = 0;
+      members.forEach(m => MEMBERS.push(m));
+
+      // 3) รูปงานรายสัปดาห์ (ทีละสัปดาห์ บันทึกเฉพาะสัปดาห์ที่มีการเปลี่ยน)
+      for (const w of weeks) {
+        msg.textContent = `กำลังบีบอัดรูปสัปดาห์ที่ ${w.no}/${weeks.length}...`;
+        const days = await loadWeekDetails(w.no, true);
+        if (!days || !days.length) continue;
+        const copy = JSON.parse(JSON.stringify(days));
+        let changed = false;
+        for (const d of copy) {
+          if (!d.photos) continue;
+          for (let i = 0; i < d.photos.length; i++) {
+            if (isBig(d.photos[i])) {
+              d.photos[i] = await shrink(d.photos[i], 1200, 0.72);
+              changed = true;
+            }
+          }
+        }
+        if (changed) {
+          if (!(await saveCloudData('weekDetails/' + w.no, copy))) throw new Error('บันทึกสัปดาห์ที่ ' + w.no + ' ไม่สำเร็จ');
+          WEEK_DETAILS[w.no] = copy;
+        }
+      }
+
+      const mb = n => (n / 1024 / 1024).toFixed(1);
+      msg.textContent = '';
+      alert(`บีบอัดเสร็จแล้ว: ${mb(before)} MB → ${mb(after)} MB\nหน้านี้จะรีเฟรชให้อัตโนมัติ`);
+      location.reload();
+    } catch (e) {
+      msg.textContent = '';
+      alert('บีบอัดไม่สำเร็จ: ' + e.message);
+    }
   });
 
   document.getElementById('reset-all').addEventListener('click', async () => {

@@ -192,7 +192,19 @@ window.dataReady.then(() => {
     }
   }
 
-  function showWeekDetail(w) {
+  async function showWeekDetail(w) {
+    // โหลดรายละเอียด (และรูป) ของสัปดาห์นี้จาก Firebase เฉพาะตอนกดดู ไม่โหลดทั้งหมดตั้งแต่เปิดหน้า
+    detail.classList.remove('hidden');
+    detail.innerHTML = '<div class="soft-card p-8 text-center text-gray-400">กำลังโหลดข้อมูลสัปดาห์ที่ ' + w.no + '...</div>';
+    detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+      await loadWeekDetails(w.no);
+    } catch (e) {
+      console.warn('โหลดข้อมูลสัปดาห์ไม่สำเร็จ', e);
+      detail.innerHTML = '<div class="soft-card p-8 text-center text-red-400">โหลดข้อมูลสัปดาห์นี้ไม่สำเร็จ ลองรีเฟรชหน้าแล้วกดใหม่อีกครั้ง</div>';
+      return;
+    }
+
     const days = WEEK_DETAILS[w.no] && WEEK_DETAILS[w.no].length > 0
       ? WEEK_DETAILS[w.no]
       : [{ date: w.start.toISOString().slice(0,10), ...DEFAULT_DAY }];
